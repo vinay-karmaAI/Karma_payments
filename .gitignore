@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env.local
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Environment & secrets — never commit .env files
+backend/.env
+.env
+.env.*
+!.env.example
+
+# Frontend config.js is committed with localhost defaults.
+# For production, update apiUrl before deploying.
+
+# ── Logs ─────────────────────────────────────────────────────────
+backend/logs/
+*.log
+
+# ── IDE / editors ─────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Pyright / Pylance ─────────────────────────────────────────────
+# pyrightconfig.json is intentionally committed (helps team Pylance setup)
+
+# ── Testing ───────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+*.coveragerc
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Desktop.ini

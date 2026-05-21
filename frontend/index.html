@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Reconciliation Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:          #080c10;
+  --surface:     #0f1419;
+  --surface2:    #161d26;
+  --surface3:    #1c2530;
+  --border:      #1f2d3d;
+  --border2:     #2a3d52;
+  --text:        #e2eaf4;
+  --text2:       #8ba0b8;
+  --text3:       #4d6278;
+  --accent:      #00d4ff;
+  --accent2:     #0099cc;
+  --green:       #00e5a0;
+  --green-dim:   #00e5a022;
+  --yellow:      #f5c842;
+  --yellow-dim:  #f5c84222;
+  --orange:      #ff8c42;
+  --orange-dim:  #ff8c4222;
+  --red:         #ff4d6d;
+  --red-dim:     #ff4d6d22;
+  --critical:    #ff4d6d;
+  --high:        #ff8c42;
+  --medium:      #f5c842;
+  --low:         #00e5a0;
+  --radius:      6px;
+  --radius2:     10px;
+  --mono:        'Space Mono', monospace;
+  --sans:        'Syne', sans-serif;
+  --glow:        0 0 20px #00d4ff22;
+  --shadow:      0 4px 24px #00000060;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px;background:var(--bg);color:var(--text);font-family:var(--sans)}
+body{min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,textarea,select{font-family:inherit}
+a{color:inherit;text-decoration:none}
+ul{list-style:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+.sidebar{
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.logo{
+  padding:24px 20px 20px;
+  border-bottom:1px solid var(--border);
+}
+.logo-mark{
+  font-family:var(--mono);
+  font-size:11px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--text3);
+  margin-bottom:6px;
+}
+.logo-title{
+  font-size:18px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav{padding:16px 12px;flex:1}
+.nav-section{margin-bottom:24px}
+.nav-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--text3);
+  padding:0 8px;margin-bottom:8px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:var(--radius);
+  font-size:13px;font-weight:500;color:var(--text2);
+  cursor:pointer;transition:all .18s;margin-bottom:2px;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{
+  background:linear-gradient(135deg,#00d4ff18,#00e5a012);
+  color:var(--accent);border:1px solid #00d4ff28;
+}
+.nav-icon{width:16px;height:16px;opacity:.7;flex-shrink:0}
+.nav-item.active .nav-icon{opacity:1}
+.sidebar-footer{
+  padding:16px;border-top:1px solid var(--border);
+}
+.status-dot{
+  display:inline-block;width:7px;height:7px;
+  border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-label{font-size:11px;color:var(--text3);margin-left:8px}
+
+.main{display:flex;flex-direction:column;min-height:100vh}
+.topbar{
+  height:56px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 28px;gap:16px;
+  position:sticky;top:0;z-index:100;
+}
+.page-title{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.topbar-spacer{flex:1}
+.badge{
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;
+  padding:3px 8px;border-radius:3px;
+  background:var(--surface3);border:1px solid var(--border2);
+  color:var(--text2);
+}
+.badge.live{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+
+.content{padding:28px;flex:1}
+
+.view{display:none;animation:fadeIn .25s}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:22px;
+}
+.section-title{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.section-sub{font-size:12px;color:var(--text3);margin-top:3px;font-family:var(--mono)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:var(--radius);
+  font-size:12px;font-weight:600;letter-spacing:.02em;
+  transition:all .18s;cursor:pointer;border:1px solid transparent;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#000;
+}
+.btn-primary:hover{filter:brightness(1.12);box-shadow:var(--glow)}
+.btn-ghost{
+  background:var(--surface2);border-color:var(--border2);color:var(--text);
+}
+.btn-ghost:hover{background:var(--surface3);border-color:var(--accent);color:var(--accent)}
+.btn-danger{
+  background:var(--red-dim);border-color:var(--red);color:var(--red);
+}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+.btn-sm{padding:6px 12px;font-size:11px}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius2);padding:20px;
+}
+
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:14px;margin-bottom:24px;
+}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius2);padding:18px;
+  position:relative;overflow:hidden;transition:border-color .2s;
+}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::before{
+  content:'';position:absolute;inset:0;
+  opacity:.04;
+}
+.stat-card.critical::before{background:var(--red)}
+.stat-card.high::before{background:var(--orange)}
+.stat-card.medium::before{background:var(--yellow)}
+.stat-card.good::before{background:var(--green)}
+.stat-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:10px;
+}
+.stat-value{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.stat-value.critical{color:var(--red)}
+.stat-value.high{color:var(--orange)}
+.stat-value.medium{color:var(--yellow)}
+.stat-value.good{color:var(--green)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:6px}
+
+.gap-table-wrap{overflow-x:auto;border-radius:var(--radius2)}
+.gap-table{width:100%;border-collapse:collapse;font-size:12px}
+.gap-table th{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text3);
+  padding:11px 14px;background:var(--surface2);
+  border-bottom:1px solid var(--border);
+  text-align:left;white-space:nowrap;
+}
+.gap-table td{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  vertical-align:middle;
+}
+.gap-table tr:last-child td{border-bottom:none}
+.gap-table tr:hover td{background:var(--surface2)}
+.mono{font-family:var(--mono);font-size:11px}
+.truncate{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sev{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  font-weight:700;padding:3px 8px;border-radius:3px;
+}
+.sev.CRITICAL{background:var(--red-dim);color:var(--red);border:1px solid #ff4d6d44}
+.sev.HIGH{background:var(--orange-dim);color:var(--orange);border:1px solid #ff8c4244}
+.sev.MEDIUM{background:var(--yellow-dim);color:var(--yellow);border:1px solid #f5c84244}
+.sev.LOW{background:var(--green-dim);color:var(--green);border:1px solid #00e5a044}
+
+.gap-type{
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;
+  padding:3px 7px;border-radius:3px;
+  background:var(--surface3);color:var(--text2);border:1px solid var(--border2);
+  white-space:nowrap;
+}
+
+.drawer-overlay{
+  position:fixed;inset:0;background:#00000080;
+  z-index:200;display:none;align-items:flex-end;
+  backdrop-filter:blur(3px);
+}
+.drawer-overlay.open{display:flex}
+.drawer{
+  width:100%;max-width:580px;margin-left:auto;
+  background:var(--surface);border-left:1px solid var(--border);
+  height:100vh;overflow-y:auto;padding:28px;
+  animation:slideIn .25s;
+}
+@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.drawer-close{
+  float:right;width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius);color:var(--text2);
+  background:var(--surface2);font-size:16px;cursor:pointer;
+}
+.drawer-close:hover{background:var(--surface3);color:var(--text)}
+.detail-key{
+  font-family:var(--mono);font-size:10px;color:var(--text3);
+  letter-spacing:.1em;margin-bottom:4px;
+}
+.detail-val{
+  font-size:13px;word-break:break-all;margin-bottom:16px;
+  background:var(--surface2);padding:10px;border-radius:var(--radius);
+  border:1px solid var(--border);
+}
+
+.ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.ai-grid{grid-template-columns:1fr}}
+.ai-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius2);padding:20px;
+}
+.ai-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;
+}
+.ai-label::before{
+  content:'';display:inline-block;width:6px;height:6px;
+  border-radius:50%;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+}
+.ai-body{font-size:13px;line-height:1.7;color:var(--text2)}
+.risk-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  padding:5px 12px;border-radius:var(--radius);margin-bottom:14px;
+}
+.risk-CRITICAL{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+.risk-HIGH{background:var(--orange-dim);color:var(--orange);border:1px solid var(--orange)}
+.risk-MEDIUM{background:var(--yellow-dim);color:var(--yellow);border:1px solid var(--yellow)}
+.risk-LOW{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+
+.rec-list{display:flex;flex-direction:column;gap:10px}
+.rec-item{
+  display:flex;gap:12px;
+  padding:12px;background:var(--surface2);border-radius:var(--radius);
+  border:1px solid var(--border);
+}
+.rec-num{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--green));
+  color:#000;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.rec-text{font-size:12px;line-height:1.5;color:var(--text2)}
+.rec-meta{font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--mono)}
+
+.chat-wrap{
+  display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius2);overflow:hidden;
+}
+.chat-messages{
+  height:360px;overflow-y:auto;padding:18px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.chat-msg{
+  display:flex;gap:10px;max-width:88%;
+}
+.chat-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.avatar{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;
+}
+.avatar.ai{background:linear-gradient(135deg,var(--accent),var(--green));color:#000}
+.avatar.user{background:var(--surface3);border:1px solid var(--border2);color:var(--text2)}
+.bubble{
+  padding:10px 14px;border-radius:10px;font-size:12px;line-height:1.65;
+  max-width:100%;
+}
+.chat-msg:not(.user) .bubble{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+}
+.chat-msg.user .bubble{
+  background:linear-gradient(135deg,#00d4ff22,#00e5a018);
+  border:1px solid #00d4ff44;color:var(--text);
+}
+.chat-footer{
+  display:flex;gap:10px;padding:14px 18px;
+  border-top:1px solid var(--border);background:var(--surface2);
+}
+.chat-input{
+  flex:1;background:var(--surface3);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:9px 12px;
+  font-size:12px;color:var(--text);outline:none;transition:border-color .18s;
+}
+.chat-input:focus{border-color:var(--accent)}
+.chat-input::placeholder{color:var(--text3)}
+.typing{display:flex;gap:4px;padding:10px 14px}
+.typing span{
+  width:6px;height:6px;border-radius:50%;background:var(--accent);
+  animation:typing .8s infinite;
+}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,80%,100%{transform:scale(.7);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+.log-container{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius2);overflow:hidden;
+}
+.log-header{
+  padding:12px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);
+}
+.log-lines{
+  height:480px;overflow-y:auto;padding:4px 0;
+  font-family:var(--mono);font-size:11px;
+}
+.log-line{
+  padding:4px 18px;line-height:1.6;
+  border-bottom:1px solid #1f2d3d44;transition:background .12s;
+}
+.log-line:hover{background:var(--surface2)}
+.log-ts{color:var(--text3);margin-right:10px}
+.log-level{margin-right:10px;font-weight:700;display:inline-block;min-width:36px}
+.log-level.INFO{color:var(--accent)}
+.log-level.ERROR{color:var(--red)}
+.log-level.WARNING{color:var(--yellow)}
+.log-level.DEBUG{color:var(--text3)}
+.log-msg{color:var(--text2)}
+
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:var(--radius2);
+  padding:40px 20px;text-align:center;
+  transition:all .2s;cursor:pointer;margin-bottom:16px;
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:var(--accent);background:#00d4ff08;
+}
+.upload-label{font-size:13px;color:var(--text2)}
+.upload-sub{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono)}
+
+.loader{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast-wrap{
+  position:fixed;top:20px;right:20px;z-index:999;
+  display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:12px 18px;
+  font-size:12px;min-width:260px;
+  box-shadow:var(--shadow);
+  animation:toastIn .25s;
+}
+@keyframes toastIn{from{transform:translateX(20px);opacity:0}to{opacity:1}}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error{border-left:3px solid var(--red)}
+.toast.info{border-left:3px solid var(--accent)}
+
+.planted-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:12px;margin-top:16px;
+}
+.planted-card{
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:14px;
+}
+.planted-type{
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  color:var(--yellow);margin-bottom:8px;
+}
+.planted-desc{font-size:11px;color:var(--text2);line-height:1.5}
+
+.empty{
+  text-align:center;padding:60px 20px;
+  color:var(--text3);font-size:13px;
+}
+
+@media(max-width:768px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
+
+.log-lines::-webkit-scrollbar{width:4px}
+.log-lines::-webkit-scrollbar-thumb{background:var(--border2)}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">Payments · Reconciliation</div>
+      <div class="logo-title">ReconcileAI</div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">Workspace</div>
+        <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard',this)">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="1" y="1" width="6" height="6" rx="1"/>
+            <rect x="9" y="1" width="6" height="6" rx="1"/>
+            <rect x="1" y="9" width="6" height="6" rx="1"/>
+            <rect x="9" y="9" width="6" height="6" rx="1"/>
+          </svg>
+          Dashboard
+        </div>
+        <div class="nav-item" data-view="run" onclick="switchView('run',this)">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <polygon points="3,2 14,8 3,14"/>
+          </svg>
+          Run Reconciliation
+        </div>
+        <div class="nav-item" data-view="gaps" onclick="switchView('gaps',this)">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="8" cy="8" r="7"/>
+            <line x1="8" y1="5" x2="8" y2="8"/>
+            <circle cx="8" cy="11" r=".8" fill="currentColor"/>
+          </svg>
+          Gap Analysis
+        </div>
+        <div class="nav-item" data-view="ai" onclick="switchView('ai',this)">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5z"/>
+          </svg>
+          AI Analysis
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Operations</div>
+        <div class="nav-item" data-view="logs" onclick="switchView('logs',this)">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+            <line x1="5" y1="5.5" x2="11" y2="5.5"/>
+            <line x1="5" y1="8" x2="11" y2="8"/>
+            <line x1="5" y1="10.5" x2="9" y2="10.5"/>
+          </svg>
+          Audit Logs
+        </div>
+        <div class="nav-item" onclick="checkHealth()">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 2v4l2.5 2.5"/>
+            <circle cx="8" cy="8" r="6"/>
+          </svg>
+          Health Check
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="status-dot" id="serverStatus"></span>
+      <span class="status-label" id="serverStatusText">Connecting...</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <span class="page-title" id="topbarTitle">Dashboard</span>
+      <div class="topbar-spacer"></div>
+      <span class="badge" id="envBadge">ENV: --</span>
+      <span class="badge live" id="runBadge" style="display:none">LIVE</span>
+    </div>
+
+    <div class="content">
+
+      <div class="view active" id="view-dashboard">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Overview</div>
+            <div class="section-sub" id="dashSub">Loading sample data...</div>
+          </div>
+          <button class="btn btn-primary" onclick="runSampleRecon()">
+            <span id="sampleBtnIcon">&#9654;</span>&nbsp;Run Sample
+          </button>
+        </div>
+
+        <div class="stat-grid" id="statGrid">
+          <div class="stat-card">
+            <div class="stat-label">Platform Transactions</div>
+            <div class="stat-value" id="st-platform">--</div>
+            <div class="stat-sub">Records in ledger</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Bank Settlements</div>
+            <div class="stat-value" id="st-bank">--</div>
+            <div class="stat-sub">Records from bank</div>
+          </div>
+          <div class="stat-card good">
+            <div class="stat-label">Matched</div>
+            <div class="stat-value good" id="st-matched">--</div>
+            <div class="stat-sub">Clean reconciliations</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Recon Rate</div>
+            <div class="stat-value" id="st-rate" style="font-size:22px">--</div>
+            <div class="stat-sub">of platform txns matched</div>
+          </div>
+          <div class="stat-card critical">
+            <div class="stat-label">Critical Gaps</div>
+            <div class="stat-value critical" id="st-critical">--</div>
+            <div class="stat-sub">Require immediate action</div>
+          </div>
+          <div class="stat-card high">
+            <div class="stat-label">High Gaps</div>
+            <div class="stat-value high" id="st-high">--</div>
+            <div class="stat-sub">Review today</div>
+          </div>
+          <div class="stat-card medium">
+            <div class="stat-label">Medium Gaps</div>
+            <div class="stat-value medium" id="st-medium">--</div>
+            <div class="stat-sub">Review this week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Variance (USD)</div>
+            <div class="stat-value" id="st-variance" style="font-size:20px">--</div>
+            <div class="stat-sub">Platform vs Bank delta</div>
+          </div>
+        </div>
+
+        <div id="plantedSection" style="display:none">
+          <div class="section-head" style="margin-top:8px">
+            <div>
+              <div class="section-title" style="font-size:16px">Planted Gaps (Ground Truth)</div>
+              <div class="section-sub">All 4 gap types seeded into sample data</div>
+            </div>
+          </div>
+          <div class="planted-grid" id="plantedGrid"></div>
+        </div>
+      </div>
+
+      <div class="view" id="view-run">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Run Reconciliation</div>
+            <div class="section-sub">Upload or paste JSON data &middot; month=2024-03</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;letter-spacing:.1em">PLATFORM TRANSACTIONS (JSON array)</div>
+            <textarea id="platformJson" rows="12"
+              style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:12px;color:var(--text);font-family:var(--mono);font-size:11px;resize:vertical;outline:none"
+              placeholder='[{"txn_id":"...","amount":"100.00","txn_date":"2024-03-15","merchant":"Acme","type":"CHARGE","status":"SETTLED"}]'></textarea>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;letter-spacing:.1em">BANK SETTLEMENTS (JSON array)</div>
+            <textarea id="bankJson" rows="12"
+              style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:12px;color:var(--text);font-family:var(--mono);font-size:11px;resize:vertical;outline:none"
+              placeholder='[{"txn_id":"...","settled_amount":"100.00","settlement_date":"2024-03-16","merchant":"Acme","batch_id":"B1","settlement_id":"S1"}]'></textarea>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="runCustomRecon()">
+            <span id="runBtnTxt">&#9654; Reconcile</span>
+          </button>
+          <button class="btn btn-ghost" onclick="loadSampleIntoEditor()">Load Sample Data</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearEditor()">Clear</button>
+        </div>
+      </div>
+
+      <div class="view" id="view-gaps">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Gap Analysis</div>
+            <div class="section-sub" id="gapSubtitle">No reconciliation run yet</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="filterBtns">
+            <button class="btn btn-ghost btn-sm active" onclick="filterGaps('ALL',this)">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterGaps('CRITICAL',this)" style="color:var(--red)">Critical</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterGaps('HIGH',this)" style="color:var(--orange)">High</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterGaps('MEDIUM',this)" style="color:var(--yellow)">Medium</button>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden" id="gapsTableCard">
+          <div class="empty" id="gapsEmpty">Run a reconciliation first to see gaps</div>
+          <div class="gap-table-wrap" id="gapsTableWrap" style="display:none">
+            <table class="gap-table">
+              <thead>
+                <tr>
+                  <th>Severity</th>
+                  <th>Type</th>
+                  <th>Title</th>
+                  <th>Merchant</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="gapsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="view-ai">
+        <div class="section-head">
+          <div>
+            <div class="section-title">AI Analysis &middot; Gemini</div>
+            <div class="section-sub">Root cause &middot; Risk &middot; Recommendations</div>
+          </div>
+          <button class="btn btn-primary" onclick="runAIAnalysis()" id="aiBtn">
+            Analyse with Gemini
+          </button>
+        </div>
+
+        <div id="aiEmpty" class="empty">
+          Run a reconciliation, then click &ldquo;Analyse with Gemini&rdquo;
+        </div>
+
+        <div id="aiContent" style="display:none">
+          <div class="ai-grid" id="aiGrid"></div>
+
+          <div style="margin-top:8px">
+            <div class="section-title" style="font-size:16px;margin-bottom:16px">Ask the AI</div>
+            <div class="chat-wrap">
+              <div class="chat-messages" id="chatMessages">
+                <div class="chat-msg">
+                  <div class="avatar ai">AI</div>
+                  <div class="bubble">Hello. I am your reconciliation analyst powered by Gemini. Ask me anything about the gaps, amounts, or recommendations from this run.</div>
+                </div>
+              </div>
+              <div class="chat-footer">
+                <input class="chat-input" id="chatInput" placeholder="e.g. Which gap has the highest financial exposure?" onkeydown="if(event.key==='Enter')sendChat()"/>
+                <button class="btn btn-primary btn-sm" onclick="sendChat()" id="chatBtn">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="view-logs">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Audit Logs</div>
+            <div class="section-sub">Live application and audit log tail</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="fetchLogs()">Refresh</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto-refresh: OFF</button>
+          </div>
+        </div>
+        <div class="log-container">
+          <div class="log-header">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text3)" id="logFileName">--</span>
+            <span class="badge" id="logCount">0 lines</span>
+          </div>
+          <div class="log-lines" id="logLines">
+            <div style="padding:20px;color:var(--text3);font-family:var(--mono);font-size:11px">Click Refresh to load logs...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+  <div class="drawer" id="drawerContent">
+    <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
+    <div id="drawerBody"></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="config.js"></script>
+<script>
+const API = (window.APP_CONFIG && window.APP_CONFIG.apiUrl
+  ? window.APP_CONFIG.apiUrl
+  : 'http://localhost:8000'
+).replace(/\/$/, '');
+
+let state = {
+  lastReconResult: null,
+  allGaps:         [],
+  chatHistory:     [],
+  autoRefresh:     null,
+  sampleData:      null,
+};
+
+const VIEW_TITLES = {
+  dashboard: 'Dashboard',
+  run:       'Run Reconciliation',
+  gaps:      'Gap Analysis',
+  ai:        'AI Analysis',
+  logs:      'Audit Logs',
+};
+
+function switchView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  document.getElementById('topbarTitle').textContent = VIEW_TITLES[name] || name;
+  if (name === 'logs') fetchLogs();
+}
+
+function toast(msg, type = 'info', duration = 4000) {
+  const wrap = document.getElementById('toastWrap');
+  const el   = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+async function checkHealth() {
+  try {
+    const res  = await fetch(`${API}/api/v1/health`);
+    const data = await res.json();
+    document.getElementById('serverStatusText').textContent =
+      data.status === 'healthy' ? 'Server Online' : 'Degraded';
+    document.getElementById('envBadge').textContent = `ENV: ${data.environment || '?'}`;
+    const dot = document.getElementById('serverStatus');
+    dot.style.background = data.status === 'healthy' ? 'var(--green)' : 'var(--red)';
+    toast(`Server v${data.version} · uptime ${data.uptime_seconds}s`, 'success');
+  } catch {
+    document.getElementById('serverStatusText').textContent = 'Server Offline';
+    document.getElementById('serverStatus').style.background = 'var(--red)';
+    document.getElementById('serverStatus').style.boxShadow = '0 0 8px var(--red)';
+    toast('Cannot reach backend. Is it running?', 'error', 6000);
+  }
+}
+
+async function runSampleRecon() {
+  const btn  = document.querySelector('[onclick="runSampleRecon()"]');
+  const icon = document.getElementById('sampleBtnIcon');
+  btn.disabled = true;
+  icon.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res  = await fetch(`${API}/api/v1/reconcile/sample`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({n_transactions: 80}),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    state.lastReconResult = data;
+    state.allGaps         = data.gaps || [];
+    state.sampleData      = data.planted_gaps;
+    populateDashboard(data);
+    populateGapsTable(data.gaps);
+    document.getElementById('runBadge').style.display = '';
+    toast(`Reconciliation complete — ${data.summary.total_gaps} gaps found`, 'success');
+  } catch(e) {
+    toast(`Error: ${e.message}`, 'error', 7000);
+  } finally {
+    btn.disabled = false;
+    icon.innerHTML = '&#9654;';
+  }
+}
+
+function populateDashboard(data) {
+  const s = data.summary;
+  document.getElementById('st-platform').textContent = s.total_platform_txns;
+  document.getElementById('st-bank').textContent     = s.total_bank_records;
+  document.getElementById('st-matched').textContent  = s.matched_txns;
+  document.getElementById('st-rate').textContent     = s.reconciliation_rate;
+  document.getElementById('st-critical').textContent = s.critical_gaps;
+  document.getElementById('st-high').textContent     = s.high_gaps;
+  document.getElementById('st-medium').textContent   = s.medium_gaps;
+  document.getElementById('st-variance').textContent = `$${s.total_variance_usd}`;
+  const dashSub = document.getElementById('dashSub');
+  if (dashSub) dashSub.textContent = `Run completed · ${s.total_platform_txns} txns · ${new Date().toLocaleTimeString()}`;
+
+  if (data.planted_gaps && data.planted_gaps.length) {
+    const grid = document.getElementById('plantedGrid');
+    grid.innerHTML = data.planted_gaps.map(g => `
+      <div class="planted-card">
+        <div class="planted-type">${g.gap_type}</div>
+        <div class="planted-desc">${g.description}</div>
+        ${g.amount ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:6px">Amount: ${g.amount}</div>` : ''}
+      </div>
+    `).join('');
+    document.getElementById('plantedSection').style.display = '';
+  }
+}
+
+function populateGapsTable(gaps) {
+  if (!gaps || !gaps.length) return;
+  document.getElementById('gapsEmpty').style.display    = 'none';
+  document.getElementById('gapsTableWrap').style.display = '';
+  document.getElementById('gapSubtitle').textContent = `${gaps.length} gaps detected`;
+  renderGapsTable(gaps);
+}
+
+function renderGapsTable(gaps) {
+  const tbody = document.getElementById('gapsTableBody');
+  tbody.innerHTML = gaps.map(g => {
+    const amt = g.amount || g.delta || g.excess_amount || g.refund_amount || '--';
+    const merchant = g.merchant || '--';
+    return `
+      <tr>
+        <td><span class="sev ${g.severity}">${g.severity}</span></td>
+        <td><span class="gap-type">${g.gap_type}</span></td>
+        <td class="truncate" title="${esc(g.title)}">${esc(g.title)}</td>
+        <td class="mono">${esc(merchant)}</td>
+        <td class="mono">${amt !== '--' ? '$'+amt : '--'}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick='openDrawer(${JSON.stringify(JSON.stringify(g))})'>
+            Detail
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterGaps(level, el) {
+  document.querySelectorAll('#filterBtns .btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = level === 'ALL'
+    ? state.allGaps
+    : state.allGaps.filter(g => g.severity === level);
+  renderGapsTable(filtered);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openDrawer(jsonStr) {
+  const gap = JSON.parse(jsonStr);
+  const body = document.getElementById('drawerBody');
+  const skip = new Set(['gap_id']);
+
+  body.innerHTML = `
+    <div style="margin-bottom:20px">
+      <span class="sev ${gap.severity}">${gap.severity}</span>
+      <span class="gap-type" style="margin-left:8px">${gap.gap_type}</span>
+    </div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:20px;line-height:1.4">${esc(gap.title)}</div>
+    ${Object.entries(gap).filter(([k]) => !skip.has(k) && k !== 'gap_type' && k !== 'severity' && k !== 'title').map(([k,v]) => `
+      <div class="detail-key">${k.toUpperCase()}</div>
+      <div class="detail-val mono">${Array.isArray(v) ? v.join(', ') : esc(String(v))}</div>
+    `).join('')}
+  `;
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+
+function closeDrawer(e) {
+  if (!e || e.target === document.getElementById('drawerOverlay')) {
+    document.getElementById('drawerOverlay').classList.remove('open');
+  }
+}
+
+async function runCustomRecon() {
+  const platRaw = document.getElementById('platformJson').value.trim();
+  const bankRaw = document.getElementById('bankJson').value.trim();
+  if (!platRaw || !bankRaw) { toast('Paste both JSON arrays first', 'error'); return; }
+
+  let plat, bank;
+  try { plat = JSON.parse(platRaw); } catch { toast('Platform JSON is invalid', 'error'); return; }
+  try { bank = JSON.parse(bankRaw); } catch { toast('Bank JSON is invalid', 'error'); return; }
+
+  const btn = document.getElementById('runBtnTxt');
+  btn.innerHTML = '<span class="loader"></span>&nbsp;Running...';
+
+  try {
+    const res = await fetch(`${API}/api/v1/reconcile`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        platform_transactions: plat,
+        bank_settlements: bank,
+        review_year: 2024, review_month: 3,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    state.lastReconResult = data;
+    state.allGaps         = data.gaps || [];
+    populateDashboard(data);
+    populateGapsTable(data.gaps);
+    switchView('gaps', document.querySelector('[data-view="gaps"]'));
+    toast(`Done — ${data.summary.total_gaps} gaps`, 'success');
+  } catch(e) {
+    toast(`Error: ${e.message}`, 'error', 7000);
+  } finally {
+    btn.innerHTML = '&#9654; Reconcile';
+  }
+}
+
+function loadSampleIntoEditor() {
+  document.getElementById('platformJson').value = JSON.stringify([
+    {
+      "txn_id": "TXN-DEMO-001",
+      "merchant": "Acme Corp",
+      "amount": "250.00",
+      "currency": "USD",
+      "payment_method": "CARD",
+      "txn_date": "2024-03-15",
+      "status": "SETTLED",
+      "type": "CHARGE"
+    },
+    {
+      "txn_id": "TXN-DEMO-002",
+      "merchant": "Bright Spark Ltd",
+      "amount": "1200.50",
+      "currency": "USD",
+      "payment_method": "BANK_TRANSFER",
+      "txn_date": "2024-03-20",
+      "status": "SETTLED",
+      "type": "CHARGE"
+    }
+  ], null, 2);
+
+  document.getElementById('bankJson').value = JSON.stringify([
+    {
+      "settlement_id": "SET-001",
+      "txn_id": "TXN-DEMO-001",
+      "merchant": "Acme Corp",
+      "settled_amount": "250.00",
+      "currency": "USD",
+      "settlement_date": "2024-03-17",
+      "batch_id": "BATCH-20240317"
+    },
+    {
+      "settlement_id": "SET-002",
+      "txn_id": "TXN-DEMO-002",
+      "merchant": "Bright Spark Ltd",
+      "settled_amount": "1200.49",
+      "currency": "USD",
+      "settlement_date": "2024-03-22",
+      "batch_id": "BATCH-20240322"
+    }
+  ], null, 2);
+
+  toast('Sample data loaded into editor', 'info', 2000);
+}
+
+function clearEditor() {
+  document.getElementById('platformJson').value = '';
+  document.getElementById('bankJson').value     = '';
+}
+
+async function runAIAnalysis() {
+  if (!state.lastReconResult) { toast('Run a reconciliation first', 'error'); return; }
+
+  const btn = document.getElementById('aiBtn');
+  btn.innerHTML = '<span class="loader"></span>&nbsp;Analysing...';
+  btn.disabled  = true;
+
+  try {
+    const res = await fetch(`${API}/api/v1/ai/analyse`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({recon_result: state.lastReconResult}),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data     = await res.json();
+    const analysis = data.analysis || {};
+
+    document.getElementById('aiEmpty').style.display   = 'none';
+    document.getElementById('aiContent').style.display = '';
+
+    renderAICards(analysis);
+    toast('Gemini analysis complete', 'success');
+  } catch(e) {
+    toast(`AI error: ${e.message}`, 'error', 7000);
+  } finally {
+    btn.innerHTML = 'Analyse with Gemini';
+    btn.disabled  = false;
+  }
+}
+
+function renderAICards(a) {
+  const grid = document.getElementById('aiGrid');
+  const risk = a.risk_level || 'MEDIUM';
+
+  grid.innerHTML = `
+    <div class="ai-card" style="grid-column:1/-1">
+      <div class="ai-label">Executive Summary &middot; ${a.source || 'Gemini'}</div>
+      <span class="risk-badge risk-${risk}">RISK: ${risk}</span>
+      <div class="ai-body">${esc(a.executive_summary || '--')}</div>
+      <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
+        <div style="font-size:11px;color:var(--text3)">
+          <span style="color:var(--text2);font-weight:600">Exposure:</span>
+          $${a.total_financial_exposure || '0.00'}
+        </div>
+        <div style="font-size:11px;color:var(--text3)">
+          <span style="color:var(--text2);font-weight:600">Recon Rate:</span>
+          ${a.key_metrics?.reconciliation_rate || '--'}
+        </div>
+        <div style="font-size:11px;color:var(--text3)">
+          <span style="color:var(--text2);font-weight:600">Critical Issues:</span>
+          ${a.key_metrics?.critical_issues ?? '--'}
+        </div>
+      </div>
+    </div>
+
+    <div class="ai-card">
+      <div class="ai-label">Root Causes</div>
+      <div class="rec-list">
+        ${(a.root_causes || []).map(rc => `
+          <div class="rec-item">
+            <div>
+              <div style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:4px">${esc(rc.gap_type)}</div>
+              <div class="rec-text">${esc(rc.root_cause)}</div>
+              <div class="rec-meta">Likelihood: ${esc(rc.likelihood)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="ai-card">
+      <div class="ai-label">Recommendations</div>
+      <div class="rec-list">
+        ${(a.recommendations || []).map(r => `
+          <div class="rec-item">
+            <div class="rec-num">${r.priority}</div>
+            <div>
+              <div class="rec-text">${esc(r.action)}</div>
+              <div class="rec-meta">Owner: ${esc(r.owner)} &middot; ${esc(r.timeline)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    ${a.production_blind_spots?.length ? `
+    <div class="ai-card" style="grid-column:1/-1">
+      <div class="ai-label">Production Blind Spots</div>
+      <ul style="display:flex;flex-direction:column;gap:8px">
+        ${a.production_blind_spots.map(b => `
+          <li style="font-size:12px;color:var(--text2);padding-left:14px;position:relative">
+            <span style="position:absolute;left:0;color:var(--orange)">&rsaquo;</span>
+            ${esc(b)}
+          </li>
+        `).join('')}
+      </ul>
+    </div>` : ''}
+  `;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const q     = input.value.trim();
+  if (!q) return;
+  if (!state.lastReconResult) { toast('Run a reconciliation first', 'error'); return; }
+
+  input.value = '';
+  appendChatMsg('user', q);
+
+  const btn = document.getElementById('chatBtn');
+  btn.disabled = true;
+  appendTyping();
+
+  try {
+    const res = await fetch(`${API}/api/v1/ai/chat`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        question:     q,
+        recon_result: state.lastReconResult,
+        history:      state.chatHistory,
+      }),
+    });
+    const data = await res.json();
+    removeTyping();
+    appendChatMsg('ai', data.answer || 'No response');
+    state.chatHistory.push(
+      {role:'user',  parts:[{text:q}]},
+      {role:'model', parts:[{text:data.answer || ''}]},
+    );
+  } catch(e) {
+    removeTyping();
+    appendChatMsg('ai', `Error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+function appendChatMsg(role, text) {
+  const msgs = document.getElementById('chatMessages');
+  const div  = document.createElement('div');
+  div.className = `chat-msg ${role === 'user' ? 'user' : ''}`;
+  div.innerHTML = `
+    <div class="avatar ${role}">${role === 'user' ? 'YOU' : 'AI'}</div>
+    <div class="bubble">${esc(text).replace(/\n/g,'<br>')}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendTyping() {
+  const msgs = document.getElementById('chatMessages');
+  const div  = document.createElement('div');
+  div.className = 'chat-msg';
+  div.id        = 'typingIndicator';
+  div.innerHTML = `<div class="avatar ai">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  document.getElementById('typingIndicator')?.remove();
+}
+
+async function fetchLogs(n = 80) {
+  try {
+    const res  = await fetch(`${API}/api/v1/logs/recent?n=${n}`);
+    const data = await res.json();
+    document.getElementById('logFileName').textContent = data.file || '--';
+    document.getElementById('logCount').textContent    = `${data.total || 0} lines`;
+
+    const container = document.getElementById('logLines');
+    if (!data.lines || !data.lines.length) {
+      container.innerHTML = '<div style="padding:20px;color:var(--text3);font-family:var(--mono);font-size:11px">No log entries yet — run a reconciliation first.</div>';
+      return;
+    }
+
+    container.innerHTML = data.lines.map(line => {
+      let parsed = null;
+      try { parsed = JSON.parse(line); } catch { /* raw line */ }
+
+      if (parsed) {
+        const rec   = parsed.record || parsed;
+        const ts    = (rec.time?.repr || rec.time || '').split('T').join(' ').split('.')[0];
+        const level = rec.level?.name || rec.level || 'INFO';
+        const msg   = rec.message || JSON.stringify(rec);
+        return `<div class="log-line">
+          <span class="log-ts">${ts}</span>
+          <span class="log-level ${level}">${level}</span>
+          <span class="log-msg">${esc(msg)}</span>
+        </div>`;
+      }
+      return `<div class="log-line"><span class="log-msg">${esc(line)}</span></div>`;
+    }).join('');
+
+    container.scrollTop = container.scrollHeight;
+  } catch(e) {
+    document.getElementById('logLines').innerHTML =
+      `<div style="padding:20px;color:var(--red);font-family:var(--mono);font-size:11px">Could not fetch logs: ${e.message}</div>`;
+  }
+}
+
+let _autoRefreshInterval = null;
+function toggleAutoRefresh() {
+  const btn = document.getElementById('autoRefreshBtn');
+  if (_autoRefreshInterval) {
+    clearInterval(_autoRefreshInterval);
+    _autoRefreshInterval = null;
+    btn.textContent = 'Auto-refresh: OFF';
+    btn.style.color = '';
+  } else {
+    _autoRefreshInterval = setInterval(fetchLogs, 5000);
+    btn.textContent = 'Auto-refresh: ON';
+    btn.style.color = 'var(--green)';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  checkHealth();
+  setInterval(checkHealth, 30000);
+  autoLoadSample();
+});
+
+async function autoLoadSample() {
+  try {
+    const res = await fetch(`${API}/api/v1/reconcile/sample`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({n_transactions: 80}),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    state.lastReconResult = data;
+    state.allGaps         = data.gaps || [];
+    state.sampleData      = data.planted_gaps;
+    populateDashboard(data);
+    populateGapsTable(data.gaps);
+    document.getElementById('runBadge').style.display = '';
+    toast(`Sample loaded — ${data.summary.total_gaps} gaps found`, 'success');
+  } catch { /* silent — user can click manually */ }
+}
+</script>
+</body>
+</html>
