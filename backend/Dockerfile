@@ -1,2 +1,2 @@
-# This file is intentionally empty.
-# The active Dockerfile is at the repo root.
+# See Dockerfile at repo root.
+FROM scratch
