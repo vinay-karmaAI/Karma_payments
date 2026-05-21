@@ -20,7 +20,15 @@ from reconciliation_engine import reconcile
 from gemini_analyst import analyse_gaps, chat_with_data
 
 
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+_here = Path(__file__).parent
+FRONTEND_DIR = next(
+    (p for p in [
+        _here / "frontend",          # Docker: copied alongside main.py
+        Path("/frontend"),           # Docker: copied to /frontend
+        _here.parent / "frontend",   # local dev: ../frontend
+    ] if p.exists()),
+    _here.parent / "frontend",       # fallback
+)
 
 
 class Settings(BaseSettings):
